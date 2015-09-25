@@ -1,3 +1,9 @@
+/*
+Refer to wiki page for sleeping barber.
+Implementing the solution by using semaphores and mutexes.
+*/
+
+
 #include <stdio.h>
 #include <unistd.h>
 #include <pthread.h>
