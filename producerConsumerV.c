@@ -8,6 +8,11 @@
 #define MAX_ITEMS 20
 #define BUF_SIZE 10
 
+
+
+/*-----------------------------Helper Functions -------------------------------------*/
+
+
 int AllocateSharedMemory(int n){
 
 	return shmget(IPC_PRIVATE, n, IPC_CREAT |0666);
@@ -41,8 +46,7 @@ void sem_up(int semid){
 }
 
 
-
-
+/*--------------------------------------------------------------------------------------*/
 
 
 
