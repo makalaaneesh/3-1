@@ -35,15 +35,6 @@ void sem_down(int semid){
 	if((semop(semid, &sb,1)) == -1){ //id, struct, number of semaphores
 		printf("%s %d\n", "Error locking semaphore",errno);
 	}
-	// if(errno == ENOMEM){
-	// 	printf("%s\n", "not enough memory");
-	// }
-	// else if(errno == E2BIG){
-	// 	printf("%s\n", "number greater");
-	// }
-	// else if(errno == ERANGE){
-	// 	printf("%s\n", "range");
-	// }
 
 }
 void sem_up(int semid){
@@ -76,11 +67,11 @@ void writer(int id){
 
 
 
-		// sem_down(writers_mutex);
-		// (*resource) = (*resource) +1;
-		// printf("Wrote value by writer#%d at %d\n",i, (*resource));
-		// sem_up(writers_mutex);
-		// // sleep(rand()%10);
+		sem_down(writers_mutex);
+		(*resource) = (*resource) +1;
+		printf("Wrote value by writer#%d at %d\n",i, (*resource));
+		sem_up(writers_mutex);
+		// sleep(rand()%10);
 
 
 }
@@ -92,29 +83,29 @@ void reader(int id){
 		
 
 
-		// //entry section 
-		// sem_down(readers_mutex);
-		// // sem_down(db); 
-		// 	reader_count++;
-		// 	if(reader_count == 1)
-		// 		sem_down(writers_mutex);
-		// // sem_up(db);
-		// sem_up(readers_mutex);
-		// //entry section
+		//entry section 
+		sem_down(readers_mutex);
+		// sem_down(db); 
+			reader_count++;
+			if(reader_count == 1)
+				sem_down(writers_mutex);
+		// sem_up(db);
+		sem_up(readers_mutex);
+		//entry section
 
-		// printf("Read value by reader #%d at %d\n",i, (*resource));
+		printf("Read value by reader #%d at %d\n",i, (*resource));
 
-		// //exit section 
-		// sem_down(readers_mutex);
-		// // sem_down(db);
-		// reader_count--;
-		// if(reader_count == 0)
-		// 	sem_up(writers_mutex);
+		//exit section 
+		sem_down(readers_mutex);
+		// sem_down(db);
+		reader_count--;
+		if(reader_count == 0)
+			sem_up(writers_mutex);
 
-		// // sem_up(db);
-		// sem_up(readers_mutex);
-		// //exit section
-		// // sleep(rand()%5);
+		// sem_up(db);
+		sem_up(readers_mutex);
+		//exit section
+		// sleep(rand()%5);
 	
 }
 
@@ -144,7 +135,7 @@ int main(){
 	// printf("%d\n",EFAULT); //(invalid address pointed to by sops argument)
 	// printf("%d\n",EIDRM); //(semaphore set was removed)
 	// printf("%d\n",EINTR );//(Signal received while sleeping)
-	printf("%d\n",EINVAL);// (set doesn
+	// printf("%d\n",EINVAL);// (set doesn
 	// printf("%d\n",ENOMEM); //(SEM_UNDO asserted, not enough memory to create the
 	      //undo structure necessary)
 	// printf("%d\n", ERANGE);// 
@@ -182,77 +173,33 @@ int main(){
 	resource = (int *)MapSharedMemory(shmid);
 	*resource = 0;
 
-	// static int rc = 0;
-	// int i;
-	// for (i = 0; i < 10; ++i) {
-	//     int pid = fork();
-	//     if (pid) {
-	//         continue;
-	//     } else if (pid == 0) {
-	    	
-	// 	    	reader(i+1);
-	// 	    	rc++;
-	    	
-	    	
-	//         break;
-	//     } else {
-	//         printf("fork error\n");
-	//         exit(1);
-	//     }
-	// }
 
-
-	int pid = fork();
-	if(pid == 0){//child
-		int i;
-		for(i = 0; i < 5; i++){
-			int pid2 = fork();
-			if (pid2 == 0){ //child
+	//loop for creating n identical processes.
+	int i;
+	int pid[5];
+	for(i = 0; i<10 ; i++){
+		pid[i]= fork();
+		if(pid[i] < 0){
+			printf("error in fork \n");
+			exit(-1);
+		}
+		else if (pid[i] == 0){
+			if(i%2 == 0)
+				writer(i+1);
+			else
 				reader(i+1);
-				break;
-			}
-			else if (pid2){ //parent
-				continue;
-			}
-			else{
-				printf("fork error\n");
-			}
+			exit(0);
 		}
 	}
-	else{
-		int pid3 = fork();
-		if(pid3 == 0){ //child
-		int i;
-			for(i = 0; i<5;i++){
-				int pid4 = fork();
-				if(pid4 == 0){
-					writer(i+1);
-					break;
-				}
-				else if (pid4){
-					continue;
-				}
-				else{
-					printf("fork error\n");
-				}
-			}
-		}
-		else{
-			int status;
-		waitpid(-1,&status, 0);
-		printf("DONe\n");
-		}
+	int c = 0;
+	int status;
 
-
-
-		int status;
-		waitpid(-1,&status, 0);
-		printf("DONe\n");
+	int p;
+	while (p = waitpid(-1, NULL, 0)) { //waiting for all child processes to terminate
+	   if (errno == ECHILD) {
+	      break;
+	   }
 	}
-
-
-     // int status;
-     // waitpid(-1,&status, 0);
-     // cleanup();
-	// printf("DONE\n");
+	printf("done!\n");
+	cleanup();
 }
