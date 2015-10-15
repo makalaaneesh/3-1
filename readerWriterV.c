@@ -8,9 +8,22 @@
 #include <sys/types.h>
 #include <errno.h>
 
-#define TESTCASES 10
+
+int *resource; //the shared variable between the reader and the writer
+
+int reader_count = 0;
+
+int  readers_mutex, writers_mutex, db ;
 
 /*-----------------------------Helper Functions -------------------------------------*/
+
+int get_sem_val(int sid)
+{
+        return( semctl(sid, 0, GETVAL, 0));
+}
+int printsemvalues(){
+	printf("readers mutex is %d, writers is %d\n", get_sem_val(readers_mutex), get_sem_val(writers_mutex));
+}
 
 
 int AllocateSharedMemory(int n){
@@ -31,7 +44,7 @@ void sem_down(int semid){
 	struct sembuf sb;
 	sb.sem_num = 0;
 	sb.sem_op = -1;
-	sb.sem_flg = 0;
+	sb.sem_flg = SEM_UNDO;
 	if((semop(semid, &sb,1)) == -1){ //id, struct, number of semaphores
 		printf("%s %d\n", "Error locking semaphore",errno);
 	}
@@ -42,7 +55,7 @@ void sem_up(int semid){
 	struct sembuf sb;
 	sb.sem_num = 0;
 	sb.sem_op = 1;
-	sb.sem_flg = 0;
+	sb.sem_flg = SEM_UNDO;
 	if((semop(semid, &sb,1)) == -1){ //id, struct, number of semaphores
 		printf("%s %d\n", "Error unlocking semaphore", errno);
 	}
@@ -53,16 +66,12 @@ void sem_up(int semid){
 
 
 
-int *resource; //the shared variable between the reader and the writer
-
-int reader_count = 0;
-
-int  readers_mutex, writers_mutex, db ;
 
 
 void writer(int id){
 	int i = id;
-		printf("in writer %d\n", id);		
+		printf("in writer %d", id);	
+		printsemvalues();	
 
 
 
@@ -79,8 +88,8 @@ void writer(int id){
 
 void reader(int id){
 	int i = id;
-		printf("in reader %d\n", id);
-		
+		printf("in reader %d", id);
+		printsemvalues();
 
 
 		//entry section 
