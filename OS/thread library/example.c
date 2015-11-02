@@ -42,7 +42,7 @@ void function1(){
 void function2(){
 	printf("This is function 2. Switching to function 1 \n");
 	setcontext(&a);
-	printf("Switched over to function 1\n");
+	printf("Switched over to function 1\n"); // never gets printed as context is switched
 
 }
 
