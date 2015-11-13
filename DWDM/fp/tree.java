@@ -19,7 +19,7 @@ public class tree {
     node root;
     HashMap<String, Integer> supportCounts;
     int minimumSupport;
-    ArrayList<ArrayList<String>> allPaths;
+    ArrayList<ArrayList<node>> allPaths;
     String prefix;
     ArrayList<ArrayList<String>> freqItemSets;
     
@@ -56,7 +56,7 @@ public class tree {
 //        add(all.get(1));
 //        add(all.get(2));
         
-        ArrayList<String> path = new ArrayList(Collections.nCopies(100, ""));
+        ArrayList<node> path = new ArrayList(Collections.nCopies(100, new node("")));
         genpaths(root, path, 0);
     }
     
@@ -150,24 +150,31 @@ public class tree {
         }
     }
     
-    public void addpath(ArrayList<String> path, int index){
-        ArrayList<String> temp = new ArrayList(path.subList(0, index));
+    public void addpath(ArrayList<node> path, int index){
+        ArrayList<node> temp = new ArrayList(path.subList(0, index));
 //        System.out.println(""+ temp);
         allPaths.add(temp);
     }
-    public void genpaths(node t, ArrayList<String> path, int index){
+    public void genpaths(node t, ArrayList<node> path, int index){
         for(node child: t.children){
-            path.set(index, child.item);
+            path.set(index, child);
             genpaths(child, path,index+1);
         }
         if(t.isLeaf()){
             addpath(path, index);
         }
     }
+    public int contains(ArrayList<node> path, String item){
+        for(node t:path){
+            if(t.ItemEquals(item))
+                return path.indexOf(t);
+        }
+        return -1;
+    }
     
     public ArrayList<ArrayList<String>> allPathsEndingIn(String item){
         ArrayList<ArrayList<String>> newpaths = new ArrayList<>();
-        for(ArrayList<String> path: allPaths){
+        for(ArrayList<node> path: allPaths){
 //            if(path.size() == 1 && (path.get(0).equals(item))){
 //                ArrayList<String> temp = new ArrayList<>();
 //                newpaths.add(temp);
@@ -176,14 +183,23 @@ public class tree {
 //                ArrayList<String> temp = new ArrayList(path.subList(0, path.size()-1));
 //                newpaths.add(temp);
 //            }
-            if(path.contains(item)){
-                ArrayList<String> temp = new ArrayList<>(path.subList(0, path.indexOf(item)));
-                newpaths.add(temp);
+            if(contains(path,item) !=-1){
+                ArrayList<node> temp = new ArrayList<>(path.subList(0, contains(path,item)));
+                ArrayList<String> temp2 = new ArrayList<>();
+                for(node t: temp){
+                    temp2.add(t.item);
+                }
+                for(int i = 0; i<path.get(contains(path,item)).supportCount; i++){
+                    ArrayList<String> tempToAdd = new ArrayList<>(temp2);
+                    if(tempToAdd.size()>0)
+                        newpaths.add(tempToAdd);
+                }
+                
             }
         }
         return newpaths;
     }
-    public ArrayList<ArrayList<String>> getPaths(){
+    public ArrayList<ArrayList<node>> getPaths(){
         
         return allPaths;
     }
