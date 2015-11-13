@@ -8,10 +8,12 @@
 
 #define MAX_THREADS 10
 #define MEM 64000 //memory allocated to each thread
+#define INTERVAL 50
 struct mythread_t{
 	int id;
 	ucontext_t uc;
 	void *retval;
+	int completed;
 };
 
 
@@ -26,7 +28,7 @@ struct queue *readyq;
 
 struct mythread_t *maint;
 struct mythread_t *current;
-
+struct itimerval timer;
 
 void initqueue(struct queue *q){
 	q->size = MAX_THREADS;
@@ -101,16 +103,70 @@ void fcfs(){
 		printf("completed a thread");	
 	}
 }
+void start_time();
+void stop_time();
 
+void roundrobin(){
+
+	while(!isEmpty(readyq)){
+		
+		struct mythread_t *to_run = dequeue(readyq);
+		current = to_run;
+		struct mythread_t *prev = to_run;
+		start_time();
+		swapcontext(&(maint->uc), &(to_run->uc));
+		stop_time();
+		printf("completed a run of roundrobin \n");
+		if(!current->completed){
+			enqueue(readyq,current);
+		}
+			
+	}
+
+
+}
+
+
+
+void sighandler(int signo){
+	swapcontext(&(current->uc), &(maint->uc));	
+}
+
+/*
 void schedule_init(){
 	if(signal(SIGVTALRM, fcfs) == SIG_ERR){
 		printf("%s\n","error in creating scheduler");
 		exit(1);
 	}
 }
+*/
+void start_time(){
+	if(setitimer(ITIMER_PROF,  &timer,0) == -1){
+		printf("error calling start time");
+		exit(1);
+	}
+}
 
+void stop_time(){
+	
+	if(setitimer(ITIMER_PROF,  0,0) == -1){
+		printf("error calling stop time");
+		exit(1);
+	}
+}
 
+void timer_init(){
+	timer.it_value.tv_sec = INTERVAL/1000;
+	timer.it_value.tv_usec = (INTERVAL*1000) %1000000;
+	//timer.it_value.tv_sec = 0;
+	//timer.it_value.tv_usec = 500;
+	timer.it_interval = timer.it_value;
 
+	if(signal(SIGPROF, sighandler) == SIG_ERR){
+		printf("%s\n","error in creating scheduler");
+		exit(1);
+	}
+}
 
 
 
@@ -167,7 +223,7 @@ int mythread_create(struct mythread_t * thread, void *(*start_routine)(void *), 
 void mythread_exit(int retval){
 	void *r = (void *) &retval;
  	current->retval = r;
-
+	current->completed = 1;
 }
 
 
@@ -176,12 +232,25 @@ void mythread_exit(int retval){
 
 void* test(void* arg){
 	printf("This is the %d test thread\n", *(int *)arg);
+	int i;
+	for(i =0; i<500;i++){
+		printf("thread1 %d\n", i);
+		int j;
+		for(j = 0; j<1000000;j++);	
+	}
 	mythread_exit(1);
 }
 
 void* test2(void* arg){
 	printf("This is the %d test thread\n", *(int *)arg);
-	sleep(5);
+//	sleep(5);
+	int i;	
+	for(i =0; i<500;i++){
+		printf("thread2 %d\n", i);
+		
+		int j;
+		for(j = 0; j<1000000;j++);	
+	}
 	mythread_exit(1);
 }
 
@@ -189,9 +258,10 @@ void* test2(void* arg){
 
 int main(){
 	mythread_init();
+	timer_init();
 	struct mythread_t t1, t2;
 	mythread_create(&t1, test, 0);
 	mythread_create(&t2, test2, 0);
-	fcfs();
+	roundrobin();
 	printf("all threads completed\n");
 }
