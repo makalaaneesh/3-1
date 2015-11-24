@@ -1,7 +1,19 @@
-#include<stdio.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+
 
 #define MAXFNAME	14
 #define BLKSIZE		512
+#define FS_CLEAN 0
+
+
+char *devfiles[] = {"TEST",NULL};
+int devfd[] = {-1, -1};
 
 // Data structure definitions
 struct SupBlock {
@@ -70,6 +82,9 @@ struct OpenFileObject {
 // and all file and directory related operations
 int main()
 {
+	// printf("hello worldS\n");
+	OpenDevice(0);
+	ShutdownDevice(0);
 }
 
 //============= SYSTEM CALL LEVEL NOT FOLLOWED =======
@@ -92,7 +107,7 @@ int MkFS(int dev, int ninodes, int nrootdir, int blksize)
 	
 	// Boot block dummy block (Because no boot loader nothing...)
 	bzero(buf, 512);
-	write(devfds[dev], buf, 512);	
+	write(devfd[dev], buf, 512);	
 	
 	// Write initialized superblock
 	strcpy(sb.sb_vname, "TESTFILESYS");
@@ -103,10 +118,10 @@ int MkFS(int dev, int ninodes, int nrootdir, int blksize)
 	sb.sb_nfreeino = inodecount;
 	sb.sb_flags = FS_CLEAN;
 	unsigned short sb_freeblks[BLKSIZE/sizeof(unsigned short)];
-	sb.	sb_freeblkindex = (BLKSIZE/sizeof(unsigned short))-1;
-	sb.	sb_freeinoindex = (BLKSIZE - (54))/2 - 1;	
-	sb. int	sb_chktime = 0;
-	sb. int	sb_ctime = 0;
+	sb.sb_freeblkindex = (BLKSIZE/sizeof(unsigned short))-1;
+	sb.sb_freeinoindex = (BLKSIZE - (54))/2 - 1;	
+	sb.sb_chktime = 0;
+	sb.sb_ctime = 0;
 	unsigned short sb_freeinos[(BLKSIZE - (54))/2];
 
 	
@@ -214,7 +229,7 @@ int ReadBlock(int dev, int blk, int buf[BLKSIZE])
 }
 
 // Writing a logical block blk to device dev
-int WriteBlock(int dev, int blk)
+int WriteBlock(int dev, int blk, int buf[BLKSIZE])
 {
 	// Check for validity of the block
 	// Check for validity of the device
@@ -224,14 +239,14 @@ int WriteBlock(int dev, int blk)
 	return write(devfd[dev], buf, BLKSIZE);
 }
 
-char *devfiles[] = {"TEST",NULL};
-int devfd[] = {-1, -1};
+
 
 // Open the device
 int OpenDevice(int dev)
 {
 	// Open the device related file for both reading and writing.
 	//
+
 	if ((devfd[dev] = open(devfiles[dev], O_RDWR)) < 0)
 	{
 		perror("Opening device file failure:");
