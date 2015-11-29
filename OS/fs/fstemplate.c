@@ -6,6 +6,7 @@
 #include <time.h>
 #include <strings.h>
 #include <string.h>
+#include <unistd.h>
 
 
 #define MAXFNAME	14
@@ -148,21 +149,26 @@ int MkFS(int dev_no)
 
 	sb.sb_freeinoindex = 0;// don't know what it's for
 	sb.sb_freeinoindex = 0;// don't know either
-	int i, count = 0 ;
-	for (i = reservblks+1; i < NUMBER_OF_BLOCKS; ++i)
+	int i, count;
+	for (i = 0; i < NUMBER_OF_BLOCKS; ++i)
 	{
-		sb.sb_freeblks[count] = i; // storing each free block's number in the array
-		count++;
+		if (i <= reservblks){
+			sb.sb_freeblks[i] = -1; // -1 indicating occupied
+		}
+		else{
+			sb.sb_freeblks[i] = 1; // 1 indicating free
+		}
 	}
 	count = 0;
 	// initialization of free inodes list
 	for (i = 1; i < INODETABSIZE; ++i)
 	{
-		sb.sb_freeinos[count] = i; // storing each free inode's number in the array
+		sb.sb_freeinos[count] = -1; // storing -1 for not free.
 		count++;
 	}
-	write(devfd[dev], &sb, sizeof(struct SupBlock));
-	write(devfd[dev], nullbuf, (SUPERBLK*BLKSIZE - sizeof(struct SupBlock))); // writing null data to the rest of the block space allocated for the super block
+	writeSuperBlock();
+	// write(devfd[dev], &sb, sizeof(struct SupBlock));
+	// write(devfd[dev], nullbuf, (SUPERBLK*BLKSIZE - sizeof(struct SupBlock))); // writing null data to the rest of the block space allocated for the super block
 
 
 	printf("Superblock written\n");
@@ -181,9 +187,9 @@ int MkFS(int dev_no)
 	nullINode.i_gen = 0;
 	nullINode.i_lnk = 0;
 	for(i=0; i<INODETABSIZE; i++)
-		write(devfd[dev], &nullINode, sizeof(struct INode));
+		WriteInode(devfd[dev], i, &nullINode);
+		// write(devfd[dev], &nullINode, sizeof(struct INode));
 
-	write(fd, &nullbuf, (INODEBLK*BLKSIZE - sizeof(struct INode));
 	printf("Inodes initialized!\n");
 	
 	// Write initialized list of directory entries
@@ -258,10 +264,9 @@ int ReadInode(int dev, int ino, struct INode *inode)
 	
 	seekTo(3); // inode block starts after 3 blokcs
 	seekBytes(ino * sizeof(struct INode)); //seek to the required inode
-	read(devfd[dev], &inode, sizeof(struct INode));
+	read(dev, &inode, sizeof(struct INode));
 	inode->i_atime = time(NULL);
-	writeInode(dev, ino, inode);// updating the last accessed time 
-
+	WriteInode(dev, ino, inode);// updating the last accessed time 
 
 }
 //write an inode structure to the device(file)
@@ -270,14 +275,15 @@ int WriteInode(int dev, int ino, struct INode *inode)
 	seekTo(3); // inode block starts after 3 blokcs
 	seekBytes(ino * sizeof(struct INode)); //seek to the required inode
 	inode->i_mtime = time(NULL); // updating the last modified time 
-	write(devfd[dev], &inode, sizeof(struct INode));
+	write(dev, inode, sizeof(struct INode));
+
 }
 // find a free inode from the freeinos list of the superblock and return a free inode and update status
 int AllocInode(int dev)
 {
 	int size = INODETABSIZE;
 	int index = sb.sb_freeinoindex;
-	int count = 0
+	int count = 0;
 	while(index == -1 && count < size){
 		index = (index + 1)%size; // finding the next free inode
 		count++;
@@ -286,6 +292,11 @@ int AllocInode(int dev)
 		printf("Inode could not be allocated\n");
 		exit(1);
 	}
+	readSuperBlock();
+	sb.sb_freeinos[index] = -1;
+	sb.sb_freeinoindex = index;
+	writeSuperBlock();
+
 
 	return index;
 
@@ -294,14 +305,48 @@ int AllocInode(int dev)
 // free an inode i.e write null inode in the file and update free inode list in superblock
 int FreeInode(int dev, int ino)
 {
+	WriteInode(dev, ino, &nullINode);
+	readSuperBlock();
+	sb.sb_freeinos[ino] = 1;
+	sb.sb_freeinoindex = ino;
+	writeSuperBlock();
+
 }
 
 int AllocBlk(int dev)
 {
+	int size = NUMBER_OF_BLOCKS;
+	int index = sb.sb_freeblkindex;
+	int count = 0;
+	while(index == -1 && count < size){
+		index = (index + 1)%size; // finding the next free inode
+		count++;
+	}
+	if (index == -1){
+		printf("block could not be allocated\n");
+		exit(1);
+	}
+	readSuperBlock();
+	sb.sb_freeblks[index] = -1;
+	sb.sb_freeblkindex = index;
+	writeSuperBlock();
+
+
+	return index;
 }
 
 int FreeBlk(int dev, int blk)
 {
+	if(blk <reservblks ){
+		printf("Can't free reserved blocks\n");
+		exit(1);
+	}
+	seekTo(blk);
+	write(dev, nullbuf, BLKSIZE);
+	readSuperBlock();
+	sb.sb_freeblks[blk] = 1;
+	sb.sb_freeblkindex = blk;
+	writeSuperBlock();
 }
 
 int readSuperBlock(){
@@ -314,10 +359,11 @@ int writeSuperBlock(){
 	seekTo(0);
 	write(devfd[dev], &sb, sizeof(struct SupBlock));
 	write(devfd[dev], nullbuf, (SUPERBLK*BLKSIZE - sizeof(struct SupBlock)));
+	return 0;
 }
 
 int seekBytes(int bytes){
-	lseek(devfd[dev], bytes, SEEK_SET);
+	lseek(devfd[dev], bytes, SEEK_CUR);
 }
 
 int seekTo(int blk){
@@ -356,7 +402,7 @@ int OpenDevice(int dev)
 	// Open the device related file for both reading and writing.
 	//
 
-	if ((devfd[dev] = open(devfiles[dev], O_RDWR)) < 0)
+	if ((devfd[dev] = open(devfiles[dev], O_RDWR|O_CREAT, 0666)) < 0)
 	{
 		perror("Opening device file failure:");
 		exit(0);
