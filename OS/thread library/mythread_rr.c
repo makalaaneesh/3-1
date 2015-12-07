@@ -118,6 +118,7 @@ void roundrobin(){
 		stop_time();
 		printf("completed a run of roundrobin \n");
 		if(!current->completed){
+			printf("%d is not done. ENqueing\n", current->id);
 			enqueue(readyq,current);
 		}
 			
@@ -205,6 +206,7 @@ int mythread_create(struct mythread_t * thread, void *(*start_routine)(void *), 
 	thread->uc.uc_stack.ss_sp = malloc(MEM);
 	thread->uc.uc_stack.ss_size = MEM;
 	thread->uc.uc_stack.ss_flags = 0;
+	thread->completed = 0;
 	makecontext(&(thread->uc), (void (*) ())start_routine, 1, (void *)&thread->id);
 	//making the current thread point to thread about to start running
 	current = thread;
